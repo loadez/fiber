@@ -22,11 +22,9 @@ blocks:
       jobs:
         - name: golangci-lint
           commands:
-            # TODO(gha-to-semaphore): original lint.yml called the reusable
-            # workflow gofiber/.github/.github/workflows/go-lint-single.yml@main.
-            # Verify the version/flags below match that workflow's behavior.
+            # Matches gofiber/.github go-lint-single.yml@main (golangci-lint v2.6.2)
             - sem-version go 1.25
-            - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+            - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.2
             - golangci-lint run ./...
 
   - name: Unit tests
