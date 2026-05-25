@@ -41,22 +41,6 @@ blocks:
             - sem-version go $GO_VERSION
             - go run gotest.tools/gotestsum@latest -f testname -- ./... -race -count=1 -shuffle=on
 
-  - name: Unit tests (macOS)
-    dependencies: []
-    task:
-      agent:
-        machine:
-          type: a1-standard-4
-          os_image: macos-xcode15
-      jobs:
-        - name: Go ${{matrix.GO_VERSION}}
-          matrix:
-            - env_var: GO_VERSION
-              values: ["1.25", "1.26"]
-          commands:
-            - sem-version go $GO_VERSION
-            - go run gotest.tools/gotestsum@latest -f testname -- ./... -race -count=1 -shuffle=on
-
   - name: Repeated tests (race, count=15)
     dependencies: []
     task:
