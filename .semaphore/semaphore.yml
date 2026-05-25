@@ -50,7 +50,7 @@ blocks:
         - name: golangci-lint
           commands:
             # TODO(gha-to-semaphore): original used reusable workflow gofiber/.github/.github/workflows/go-lint-single.yml — inlined here.
-            - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+            - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
             - export PATH=$(go env GOPATH)/bin:$PATH
             - golangci-lint run --timeout=10m ./...
 
@@ -93,7 +93,7 @@ blocks:
       jobs:
         - name: cspell + codespell
           commands:
-            - sem-version node 20
+            - sem-version node 22
             - npm install --no-save
               @cspell/dict-en_us @cspell/dict-en-gb @cspell/dict-software-terms
               @cspell/dict-golang @cspell/dict-fullstack @cspell/dict-docker
