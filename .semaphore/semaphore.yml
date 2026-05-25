@@ -86,10 +86,13 @@ blocks:
     task:
       jobs:
         - name: bench
+          parallelism: 4
           commands:
-            - set -o pipefail; go test ./... -benchmem -run=^$ -bench . | tee output.txt
+            - PKGS=$(go list ./... | awk "NR % $SEMAPHORE_JOB_COUNT == ($SEMAPHORE_JOB_INDEX - 1)")
+            - echo "Shard $SEMAPHORE_JOB_INDEX/$SEMAPHORE_JOB_COUNT — $(echo "$PKGS" | wc -l) packages"
+            - set -o pipefail; go test $PKGS -benchmem -run=^$ -bench . | tee output.txt
             - awk '!/^Benchmark.*_Parallel/' output.txt > output_filtered.txt && mv output_filtered.txt output.txt
-            - artifact push workflow output.txt --destination "benchmark-${SEMAPHORE_GIT_SHA}.txt"
+            - artifact push workflow output.txt --destination "benchmark-${SEMAPHORE_GIT_SHA}-${SEMAPHORE_JOB_INDEX}.txt"
       # TODO(gha-to-semaphore): benchmark-action/github-action-benchmark publishes to gh-pages branch
       # and comments on PRs. No clean Semaphore equivalent — bench output stored as artifact.
 
