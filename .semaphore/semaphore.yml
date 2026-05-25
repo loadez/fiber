@@ -20,13 +20,16 @@ blocks:
     task:
       jobs:
         - name: go test
+          parallelism: 4
           commands:
             - go version
-            - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- ./... -race -count=1 -coverprofile=coverage.txt -covermode=atomic -shuffle=on
+            - PKGS=$(go list ./... | awk "NR % $SEMAPHORE_JOB_COUNT == ($SEMAPHORE_JOB_INDEX - 1)")
+            - echo "Shard $SEMAPHORE_JOB_INDEX/$SEMAPHORE_JOB_COUNT — $(echo "$PKGS" | wc -l) packages"
+            - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- $PKGS -race -count=1 -coverprofile=coverage.txt -covermode=atomic -shuffle=on
       epilogue:
         always:
           commands:
-            - test-results publish junit.xml --name "linux" || true
+            - test-results publish junit.xml --name "linux-${SEMAPHORE_JOB_INDEX}" || true
 
   # TODO(gha-to-semaphore): Windows + macOS matrix dropped — semdemo has no Windows/mac agents.
   # Go matrix (1.25/1.26) collapsed to single preinstalled Go on ubuntu2404.
@@ -36,12 +39,15 @@ blocks:
     task:
       jobs:
         - name: gotestsum count=15
+          parallelism: 5
           commands:
-            - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- ./... -race -count=15 -shuffle=on
+            - PKGS=$(go list ./... | awk "NR % $SEMAPHORE_JOB_COUNT == ($SEMAPHORE_JOB_INDEX - 1)")
+            - echo "Shard $SEMAPHORE_JOB_INDEX/$SEMAPHORE_JOB_COUNT — $(echo "$PKGS" | wc -l) packages"
+            - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- $PKGS -race -count=15 -shuffle=on
       epilogue:
         always:
           commands:
-            - test-results publish junit.xml --name "repeated" || true
+            - test-results publish junit.xml --name "repeated-${SEMAPHORE_JOB_INDEX}" || true
 
   - name: Lint
     dependencies: []
