@@ -7,6 +7,9 @@ agent:
     os_image: ubuntu2404
 
 global_job_config:
+  env_vars:
+    - name: GOTOOLCHAIN
+      value: local
   prologue:
     commands:
       - checkout
@@ -15,33 +18,22 @@ blocks:
   - name: Test (Linux)
     dependencies: []
     task:
-      prologue:
-        commands:
-          - 'curl -sL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | sudo tar -C /usr/local -xz'
-          - export PATH=/usr/local/go/bin:$PATH
-          - go version
       jobs:
-        - name: Go matrix
-          matrix:
-            - env_var: GO_VERSION
-              values: ["1.25.0", "1.26.0"]
+        - name: go test
           commands:
+            - go version
             - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- ./... -race -count=1 -coverprofile=coverage.txt -covermode=atomic -shuffle=on
       epilogue:
         always:
           commands:
-            - test-results publish junit.xml --name "go-${GO_VERSION}" || true
+            - test-results publish junit.xml --name "linux" || true
 
   # TODO(gha-to-semaphore): Windows + macOS matrix dropped — semdemo has no Windows/mac agents.
-  # Original GHA matrix included windows-latest and macos-latest. Add self-hosted agent types to restore.
+  # Go matrix (1.25/1.26) collapsed to single preinstalled Go on ubuntu2404.
 
   - name: Test repeated (race x15)
     dependencies: []
     task:
-      prologue:
-        commands:
-          - 'curl -sL "https://go.dev/dl/go1.25.0.linux-amd64.tar.gz" | sudo tar -C /usr/local -xz'
-          - export PATH=/usr/local/go/bin:$PATH
       jobs:
         - name: gotestsum count=15
           commands:
@@ -54,10 +46,6 @@ blocks:
   - name: Lint
     dependencies: []
     task:
-      prologue:
-        commands:
-          - 'curl -sL "https://go.dev/dl/go1.25.0.linux-amd64.tar.gz" | sudo tar -C /usr/local -xz'
-          - export PATH=/usr/local/go/bin:$PATH
       jobs:
         - name: golangci-lint
           commands:
@@ -72,10 +60,6 @@ blocks:
       env_vars:
         - name: GO111MODULE
           value: "on"
-      prologue:
-        commands:
-          - 'curl -sL "https://go.dev/dl/go1.25.0.linux-amd64.tar.gz" | sudo tar -C /usr/local -xz'
-          - export PATH=/usr/local/go/bin:$PATH
       jobs:
         - name: govulncheck
           commands:
@@ -86,10 +70,6 @@ blocks:
   - name: Modernize
     dependencies: []
     task:
-      prologue:
-        commands:
-          - 'curl -sL "https://go.dev/dl/go1.25.0.linux-amd64.tar.gz" | sudo tar -C /usr/local -xz'
-          - export PATH=/usr/local/go/bin:$PATH
       jobs:
         - name: modernize
           commands:
@@ -98,10 +78,6 @@ blocks:
   - name: Benchmark
     dependencies: []
     task:
-      prologue:
-        commands:
-          - 'curl -sL "https://go.dev/dl/go1.25.0.linux-amd64.tar.gz" | sudo tar -C /usr/local -xz'
-          - export PATH=/usr/local/go/bin:$PATH
       jobs:
         - name: bench
           commands:
