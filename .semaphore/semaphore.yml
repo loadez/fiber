@@ -37,8 +37,6 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/**/*.md'], default_branch: 'main'})"
     task:
-      secrets:
-        - name: codecov
       jobs:
         - name: Go ${{matrix.GO_VERSION}}
           matrix:
@@ -46,14 +44,7 @@ blocks:
               values: ["1.25", "1.26"]
           commands:
             - sem-version go $GO_VERSION
-            - go run gotest.tools/gotestsum@latest -f testname -- ./... -race -count=1 -coverprofile=coverage.txt -covermode=atomic -shuffle=on
-            # Codecov upload only on Go 1.25 (matches GHA condition: ubuntu + 1.25.x)
-            - |
-              if [ "$GO_VERSION" = "1.25" ]; then
-                curl -Os https://cli.codecov.io/latest/linux/codecov
-                chmod +x codecov
-                ./codecov upload-process -t "$CODECOV_TOKEN" -F unittests -s coverage.txt --slug gofiber/fiber
-              fi
+            - go run gotest.tools/gotestsum@latest -f testname -- ./... -race -count=1 -shuffle=on
 
   - name: Unit tests (macOS)
     dependencies: []
