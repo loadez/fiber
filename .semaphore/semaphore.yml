@@ -1,0 +1,149 @@
+version: v1.0
+name: Fiber CI
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2404
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+
+blocks:
+  - name: Test (Linux)
+    dependencies: []
+    task:
+      jobs:
+        - name: Go matrix
+          matrix:
+            - env_var: GO_VERSION
+              values: ["1.25.x", "1.26.x"]
+          commands:
+            - sem-version go $GO_VERSION
+            - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- ./... -race -count=1 -coverprofile=coverage.txt -covermode=atomic -shuffle=on
+            - artifact push job coverage.txt --destination "coverage-${GO_VERSION}.txt" || true
+      epilogue:
+        always:
+          commands:
+            - test-results publish junit.xml --name "go-${GO_VERSION}" || true
+
+  - name: Test (macOS)
+    dependencies: []
+    task:
+      agent:
+        machine:
+          type: a1-standard-4
+          os_image: macos-xcode15
+      jobs:
+        - name: Go matrix macOS
+          matrix:
+            - env_var: GO_VERSION
+              values: ["1.25.x", "1.26.x"]
+          commands:
+            - sem-version go $GO_VERSION
+            - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- ./... -race -count=1 -shuffle=on
+      epilogue:
+        always:
+          commands:
+            - test-results publish junit.xml --name "macos-go-${GO_VERSION}" || true
+
+  # TODO(gha-to-semaphore): Windows matrix dropped — semdemo org has no Windows agents by default.
+  # Original GHA matrix included windows-latest. Add a self-hosted Windows agent type to restore.
+
+  - name: Test repeated (race x15)
+    dependencies: []
+    task:
+      jobs:
+        - name: gotestsum count=15
+          commands:
+            - sem-version go stable
+            - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- ./... -race -count=15 -shuffle=on
+      epilogue:
+        always:
+          commands:
+            - test-results publish junit.xml --name "repeated" || true
+
+  - name: Lint
+    dependencies: []
+    task:
+      jobs:
+        - name: golangci-lint
+          commands:
+            - sem-version go 1.25.x
+            # TODO(gha-to-semaphore): original used reusable workflow gofiber/.github/.github/workflows/go-lint-single.yml — inlined here.
+            - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+            - golangci-lint run --timeout=10m ./...
+
+  - name: Vulncheck
+    dependencies: []
+    task:
+      env_vars:
+        - name: GO111MODULE
+          value: "on"
+      jobs:
+        - name: govulncheck
+          commands:
+            - sem-version go stable
+            - go install golang.org/x/vuln/cmd/govulncheck@latest
+            - govulncheck ./...
+
+  - name: Modernize
+    dependencies: []
+    task:
+      jobs:
+        - name: modernize
+          commands:
+            - sem-version go 1.25.x
+            - go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@v0.21.1 -test=false ./...
+
+  - name: Benchmark
+    dependencies: []
+    task:
+      jobs:
+        - name: bench
+          commands:
+            - sem-version go 1.25.x
+            - set -o pipefail; go test ./... -benchmem -run=^$ -bench . | tee output.txt
+            - awk '!/^Benchmark.*_Parallel/' output.txt > output_filtered.txt && mv output_filtered.txt output.txt
+            - artifact push workflow output.txt --destination "benchmark-${SEMAPHORE_GIT_SHA}.txt"
+      # TODO(gha-to-semaphore): benchmark-action/github-action-benchmark publishes to gh-pages branch
+      # and comments on PRs. No clean Semaphore equivalent — bench output stored as artifact.
+      # For PR comparison, fetch artifact from main run and diff manually, or write a custom step.
+
+  - name: Spell check
+    dependencies: []
+    task:
+      jobs:
+        - name: cspell + codespell
+          commands:
+            - sem-version node 20
+            - npm install --no-save
+              @cspell/dict-en_us @cspell/dict-en-gb @cspell/dict-software-terms
+              @cspell/dict-golang @cspell/dict-fullstack @cspell/dict-docker
+              @cspell/dict-k8s @cspell/dict-node @cspell/dict-npm
+              @cspell/dict-typescript @cspell/dict-html @cspell/dict-css
+              @cspell/dict-shell @cspell/dict-python @cspell/dict-redis
+              @cspell/dict-sql @cspell/dict-filetypes @cspell/dict-companies
+              @cspell/dict-markdown @cspell/dict-en-common-misspellings
+              @cspell/dict-people-names @cspell/dict-data-science cspell@latest
+            - npx cspell --no-progress --show-context "**"
+            - pip install --user codespell
+            - export PATH=$HOME/.local/bin:$PATH
+            - codespell --skip='./.git,./node_modules,./**/*.go,./*.go,./.github/workflows/spell-check.yml' --ignore-words-list='TE,te'
+
+  - name: Markdown lint
+    dependencies: []
+    task:
+      jobs:
+        - name: markdownlint-cli2
+          commands:
+            - sem-version node 20
+            - npm install -g markdownlint-cli2
+            - markdownlint-cli2 "**/*.md" "#vendor"
+
+# TODO(gha-to-semaphore): GitHub-only workflows skipped (no Semaphore equivalent):
+#   auto-labeler, release-drafter, cleanup-release-draft, after-release, update-version,
+#   v3-label-automation, move-closed-milestone-items, dependabot_automerge, dependabot-on-demand,
+#   manual-dependabot, sync-docs. These remain in .github/workflows/.
