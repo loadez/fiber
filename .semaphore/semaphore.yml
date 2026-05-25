@@ -18,9 +18,6 @@ global_job_config:
 blocks:
   - name: Lint
     dependencies: []
-    run:
-      # Mirrors GHA paths-ignore: **/*.md
-      when: "change_in('/', {exclude: ['/**/*.md'], default_branch: 'main'})"
     task:
       jobs:
         - name: golangci-lint
@@ -34,8 +31,6 @@ blocks:
 
   - name: Unit tests (Linux)
     dependencies: []
-    run:
-      when: "change_in('/', {exclude: ['/**/*.md'], default_branch: 'main'})"
     task:
       jobs:
         - name: Go ${{matrix.GO_VERSION}}
@@ -48,8 +43,6 @@ blocks:
 
   - name: Unit tests (macOS)
     dependencies: []
-    run:
-      when: "change_in('/', {exclude: ['/**/*.md'], default_branch: 'main'})"
     task:
       agent:
         machine:
@@ -66,8 +59,6 @@ blocks:
 
   - name: Repeated tests (race, count=15)
     dependencies: []
-    run:
-      when: "change_in('/', {exclude: ['/**/*.md'], default_branch: 'main'})"
     task:
       jobs:
         - name: Repeated
