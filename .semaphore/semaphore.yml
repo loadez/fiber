@@ -35,13 +35,15 @@ blocks:
     dependencies: []
     task:
       jobs:
-        - name: gotestsum count=15
+        - name: gotestsum run
+          parallelism: 15
           commands:
-            - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- ./... -race -count=15 -shuffle=on
+            - echo "Run $SEMAPHORE_JOB_INDEX/$SEMAPHORE_JOB_COUNT — full suite"
+            - go run gotest.tools/gotestsum@latest -f testname --junitfile junit.xml -- ./... -race -count=1 -shuffle=on
       epilogue:
         always:
           commands:
-            - test-results publish junit.xml --name "repeated" || true
+            - test-results publish junit.xml --name "repeated-${SEMAPHORE_JOB_INDEX}" || true
 
   - name: Lint
     dependencies: []
