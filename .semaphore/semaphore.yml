@@ -80,11 +80,16 @@ blocks:
     task:
       jobs:
         - name: bench
-          parallelism: 4
+          parallelism: 8
           commands:
-            - PKGS=$(go list ./... | awk "NR % $SEMAPHORE_JOB_COUNT == ($SEMAPHORE_JOB_INDEX - 1)")
-            - echo "Shard $SEMAPHORE_JOB_INDEX/$SEMAPHORE_JOB_COUNT — $(echo "$PKGS" | wc -l) packages"
-            - set -o pipefail; go test $PKGS -benchmem -run=^$ -bench . | tee output.txt
+            - bash .semaphore/bench-shard.sh > shard.txt
+            - 'echo "Shard $SEMAPHORE_JOB_INDEX/$SEMAPHORE_JOB_COUNT — $(wc -l < shard.txt) packages, $(awk -F"\t" "{n=split(\$2,a,\"|\"); s+=n} END {print s}" shard.txt) benchmarks"'
+            - rm -f output.txt
+            - 'while IFS=$''\t'' read -r pkg names; do
+                [ -z "$pkg" ] && continue;
+                set -o pipefail;
+                go test "$pkg" -benchmem -run=^$ -bench "^($names)$" | tee -a output.txt;
+              done < shard.txt'
             - awk '!/^Benchmark.*_Parallel/' output.txt > output_filtered.txt && mv output_filtered.txt output.txt
             - artifact push workflow output.txt --destination "benchmark-${SEMAPHORE_GIT_SHA}-${SEMAPHORE_JOB_INDEX}.txt"
       # TODO(gha-to-semaphore): benchmark-action/github-action-benchmark publishes to gh-pages branch
